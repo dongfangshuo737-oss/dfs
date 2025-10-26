@@ -1,0 +1,2 @@
+final use  spo2_predictor.py to extract RGB from Video 
+ use train_spo2_model.py modle to predict

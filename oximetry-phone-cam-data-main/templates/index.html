@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SpO2预测系统</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .upload-section {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            margin: 10px 0;
+            display: none;
+        }
+        #chart {
+            margin-top: 20px;
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>SpO2预测系统</h1>
+        
+        <div class="upload-section">
+            <input type="file" id="videoFile" accept="video/*" style="display: none;">
+            <button class="button" onclick="document.getElementById('videoFile').click()">选择视频文件</button>
+            <button class="button" id="predictButton" disabled onclick="predict()">开始预测</button>
+        </div>
+
+        <div id="fileName"></div>
+        <div id="error" class="error"></div>
+        
+        <div id="loading" class="loading">
+            处理中，请稍候...
+        </div>
+
+        <div id="results">
+            <h2>预测结果</h2>
+            <p>平均SpO2值: <span id="averageSpo2"></span>%</p>
+            <div id="chart"></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('videoFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('fileName').textContent = '已选择文件: ' + file.name;
+                document.getElementById('predictButton').disabled = false;
+            }
+        });
+
+        function predict() {
+            const file = document.getElementById('videoFile').files[0];
+            if (!file) {
+                showError('请先选择视频文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('video', file);
+
+            // 显示加载状态
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('predictButton').disabled = true;
+
+            fetch('/predict', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                displayResults(data);
+            })
+            .catch(error => {
+                showError('预测过程中出错: ' + error.message);
+            })
+            .finally(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('predictButton').disabled = false;
+            });
+        }
+
+        function displayResults(data) {
+            document.getElementById('results').style.display = 'block';
+            document.getElementById('averageSpo2').textContent = data.average_spo2.toFixed(1);
+
+            // 创建时间序列图表
+            const trace = {
+                y: data.predictions,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'SpO2',
+                line: {
+                    color: '#17BECF'
+                }
+            };
+
+            const layout = {
+                title: 'SpO2值变化趋势',
+                xaxis: {
+                    title: '时间 (秒)'
+                },
+                yaxis: {
+                    title: 'SpO2 (%)'
+                }
+            };
+
+            Plotly.newPlot('chart', [trace], layout);
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
